@@ -1,23 +1,25 @@
 package ru.yandex.practicum.filmorate.controller;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
+import ru.yandex.practicum.filmorate.exception.ResourceNotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.User;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-
-@Slf4j
 @RestController
 @RequestMapping("/films")
 public class FilmController {
 
     private
     final List<Film> films = new ArrayList<>();
+    private static final Logger log = LoggerFactory.getLogger(User.class); // Добавляем логгер
 
     @GetMapping
     public List<Film> findAll() {
@@ -43,14 +45,20 @@ public class FilmController {
     @PutMapping
     public Film update(@RequestBody Film film) {
         try {
+            // 1. Проверка на наличие ID
+            if (film.getId() == 0) { // Предполагаем, что 0 - значение по умолчанию для нового фильма
+                throw new ValidationException("ID фильма должен быть указан");
+            }
+            Film existingFilm = films.stream()
+                    .filter(f -> f.getId() == film.getId())
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Фильм с ID " + film.getId() + " не найден"));
             validateFilm(film);
-            // Здесь должна быть логика для обновления фильма в списке films
-            // Например, поиск фильма по id и замена его на новый
-            log.info("Обновлен фильм: {}", film);
-            return film;
-        } catch (ValidationException e) {
-            log.warn("Ошибка валидации при обновлении фильма: {}", e.getMessage());
-            throw e;
+            log.info("Обновлен фильм: {}", existingFilm);
+            return existingFilm;
+        } catch (ValidationException | ResourceNotFoundException e) {
+            log.warn("Ошибка при обновлении фильма: {}", e.getMessage());
+            throw e; // Перебрасываем исключение дальше для обработки
         }
     }
 

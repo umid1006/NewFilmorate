@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
+import ru.yandex.practicum.filmorate.exception.ResourceNotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 
@@ -12,7 +13,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
-@Slf4j
 @RestController
 @RequestMapping("/users")
 public class UserController {
@@ -30,6 +30,8 @@ public class UserController {
     public User create(@Valid @RequestBody User user) {
         try {
             validateUser(user);
+            int newId = generateId();
+            user.setId(newId);
             users.add(user);
             log.info("Добавлен новый пользователь: {}", user);
             return user;
@@ -39,16 +41,35 @@ public class UserController {
         }
     }
 
+    private int generateId() {
+        // Логика для генерации уникального ID
+        // (например, на основе максимального существующего ID + 1)
+        int maxId = users.stream()
+                .mapToInt(User::getId)
+                .max()
+                .orElse(0);
+        return maxId + 1;
+    }
+
     @PutMapping
     public User update(@RequestBody User user) {
         try {
-            validateUser(user);
-            // ... (логика обновления пользователя)
-            log.info("Обновлен пользователь: {}", user);
-            return user;
-        } catch (ValidationException e) {
-            log.warn("Ошибка валидации при обновлении пользователя: {}", e.getMessage());
-            throw e;
+            // 1. Проверка на наличие ID
+            if (user.getId() == 0) { // Проверяем, что ID не равен 0 (или другому значению по умолчанию)
+                throw new ValidationException("ID пользователя должен быть указан");
+            }
+
+            // 2. Поиск пользователя по ID
+            User existingUser = users.stream()
+                    .filter(u -> u.getId() == user.getId())
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Пользователь с ID " + user.getId() + " не найден"));
+
+            log.info("Обновлен пользователь: {}", existingUser);
+            return existingUser;
+        } catch (ValidationException | ResourceNotFoundException e) {
+            log.warn("Ошибка при обновлении пользователя: {}", e.getMessage());
+            throw e; // Перебрасываем исключение дальше для обработки
         }
     }
 
@@ -70,4 +91,3 @@ public class UserController {
         }
     }
 }
-
